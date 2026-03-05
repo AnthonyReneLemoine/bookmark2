@@ -192,6 +192,12 @@
     }
 
 
+
+    function safeHostname(url) {
+      try { return new URL(url || '').hostname; }
+      catch (_) { return ''; }
+    }
+
     function createCategoryCard(name, bms) {
       let order = configLayout.items?.[name] || [];
       bms.sort((a,b) => order.indexOf(a.id) - order.indexOf(b.id));
@@ -206,8 +212,8 @@
         </div>
         <div class="cat-list items-container ${isCollapsed ? 'hidden' : ''}" data-cat="${name}">
           ${bms.map(bm => `
-            <div class="bookmark-item" data-id="${bm.id}" oncontextmenu="showBookMenu(event, '${bm.id}', '${bm.title.replace(/'/g, \"\\'\")}')">
-              <img src="https://www.google.com/s2/favicons?domain=${new URL(bm.url).hostname}&sz=32" class="favicon">
+            <div class="bookmark-item" data-id="${bm.id}" oncontextmenu="showBookMenu(event, '${bm.id}', '${bm.title.replace(/'/g, "\\'")}')">
+              <img src="https://www.google.com/s2/favicons?domain=${safeHostname(bm.url)}&sz=32" class="favicon">
               <a href="${bm.url}" target="_blank" class="bm-link">${bm.title}</a>
             </div>`).join('')}
         </div>`;
