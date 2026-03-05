@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MANAGER V45</title>
+  <title>MANAGER V46</title>
   <link rel="icon" type="image/png" href="bookmark-43-240.png">
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
@@ -49,7 +49,7 @@
   <header class="bg-slate-900 text-white sticky top-0 z-50">
     <div class="max-w-[1600px] mx-auto px-4 py-3 flex justify-between items-center">
       <div class="flex items-center gap-4">
-          <h1 class="text-lg font-black tracking-tighter italic text-blue-400">MANAGER V45</h1>
+          <h1 class="text-lg font-black tracking-tighter italic text-blue-400">MANAGER V46</h1>
           <div id="sync-badge" class="sync-ok">SYNC: OK</div>
       </div>
 
@@ -326,7 +326,7 @@
         let x = e.clientX;
         let y = e.clientY;
         const menuWidth = 220;
-        const menuHeight = 300; // Estimation
+        const menuHeight = 300; 
         
         if (x + menuWidth > window.innerWidth) x = window.innerWidth - menuWidth - 10;
         if (y + menuHeight > window.innerHeight) y = window.innerHeight - menuHeight - 10;
@@ -395,7 +395,10 @@
     function hideMenus() { document.getElementById('ctx-menu').style.display = 'none'; }
     document.addEventListener('click', hideMenus);
     window.setColumns = async (c) => { configLayout.columnCount = c; renderContent(); await setDoc(doc(db, "config", "layout"), { columnCount: c }, { merge: true }); };
-    window.openAddModal = () => window.open('add.html', 'Ajout', 'width=450,height=650');
+    
+    window.openAddModal = () => {
+        window.open('add.html?tab=' + encodeURIComponent(currentTab), 'Ajout', 'width=450,height=650');
+    };
 
     document.getElementById('search').addEventListener('keyup', (e) => {
         const v = e.target.value.toLowerCase();
