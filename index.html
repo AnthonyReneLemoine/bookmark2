@@ -92,7 +92,7 @@
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-    import { getFirestore, collection, onSnapshot, query, doc, setDoc, deleteDoc, updateDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, onSnapshot, query, doc, setDoc, deleteDoc, updateDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyC6o44PrBjcE-0jy4HnXMavCdzvHG0es7w",
@@ -191,6 +191,10 @@
       initSortables();
     }
 
+    function isFakeSeparator(bm) {
+      return bm?.title === '---------------';
+    }
+
     function createCategoryCard(name, bms) {
       let order = configLayout.items?.[name] || [];
       bms.sort((a,b) => order.indexOf(a.id) - order.indexOf(b.id));
@@ -204,11 +208,23 @@
           <span class="text-[9px] bg-slate-100 px-2 py-0.5 rounded-full font-bold text-slate-400">${bms.length}</span>
         </div>
         <div class="cat-list items-container ${isCollapsed ? 'hidden' : ''}" data-cat="${name}">
-          ${bms.map(bm => `
-            <div class="bookmark-item" data-id="${bm.id}" oncontextmenu="showBookMenu(event, '${bm.id}', '${bm.title.replace(/'/g, "\\'")}')">
-              <img src="https://www.google.com/s2/favicons?domain=${new URL(bm.url).hostname}&sz=32" class="favicon">
-              <a href="${bm.url}" target="_blank" class="bm-link">${bm.title}</a>
-            </div>`).join('')}
+          ${bms.map(bm => {
+            const safeTitle = (bm.title || '').replace(/'/g, "\\'");
+            if (isFakeSeparator(bm)) {
+              return `
+                <div class="bookmark-item" data-id="${bm.id}" oncontextmenu="showBookMenu(event, '${bm.id}', '${safeTitle}')">
+                  <span class="bm-link text-slate-300 font-bold tracking-wider text-center">${bm.title}</span>
+                </div>`;
+            }
+
+            let hostname = '';
+            try { hostname = new URL(bm.url).hostname; } catch (_) {}
+            return `
+              <div class="bookmark-item" data-id="${bm.id}" oncontextmenu="showBookMenu(event, '${bm.id}', '${safeTitle}')">
+                <img src="https://www.google.com/s2/favicons?domain=${hostname}&sz=32" class="favicon">
+                <a href="${bm.url}" target="_blank" class="bm-link">${bm.title}</a>
+              </div>`;
+          }).join('')}
         </div>`;
       return card;
     }
@@ -326,10 +342,23 @@
     };
 
     window.showTabMenu = (e, t) => { e.preventDefault(); e.stopPropagation(); selTabName = t; const m = document.getElementById('ctx-menu'); m.innerHTML = `<div class="px-3 py-1 text-[10px] font-bold text-slate-400 border-b mb-1 uppercase">${t}</div><div onclick="deleteCurrentTab()" class="cm-item text-red-500"><span>✕</span> SUPPRIMER</div>`; m.style.display = 'block'; m.style.left = e.pageX + 'px'; m.style.top = e.pageY + 'px'; };
-    window.showBookMenu = (e, id, t) => { e.preventDefault(); e.stopPropagation(); selId = id; const m = document.getElementById('ctx-menu'); let h = `<div class="px-3 py-1 text-[10px] font-bold text-slate-400 border-b mb-1 uppercase truncate">${t}</div><div onclick="cmAction('rename')" class="cm-item"><span>✎</span> RENOMMER</div><div onclick="cmAction('delete')" class="cm-item text-red-500"><span>✕</span> SUPPRIMER</div><div class="cm-item cm-has-sub"><span>➡</span> DÉPLACER VERS...<div class="cm-submenu">`; (configLayout.tabs || []).forEach(tab => { const cats = [...new Set(allBookmarks.filter(b => b.tab.toUpperCase() === tab).map(b => b.category.toUpperCase()))].sort(); h += `<div class="px-3 py-1 text-[9px] font-black bg-slate-50 text-slate-400 uppercase">${tab}</div>`; cats.forEach(c => h += `<div onclick="moveBookmarkTo('${tab}','${c}')" class="px-4 py-1.5 hover:bg-blue-50 text-[11px] font-bold text-slate-600 cursor-pointer border-b">↳ ${c}</div>`); }); m.innerHTML = h + `</div></div>`; m.style.display = 'block'; m.style.left = e.pageX + 'px'; m.style.top = e.pageY + 'px'; };
+    window.showBookMenu = (e, id, t) => { e.preventDefault(); e.stopPropagation(); selId = id; const m = document.getElementById('ctx-menu'); let h = `<div class="px-3 py-1 text-[10px] font-bold text-slate-400 border-b mb-1 uppercase truncate">${t}</div><div onclick="addFakeBookmarkSeparator()" class="cm-item text-blue-600"><span>➕</span> AJOUTER UN SÉPARATEUR</div><div onclick="cmAction('rename')" class="cm-item"><span>✎</span> RENOMMER</div><div onclick="cmAction('delete')" class="cm-item text-red-500"><span>✕</span> SUPPRIMER</div><div class="cm-item cm-has-sub"><span>➡</span> DÉPLACER VERS...<div class="cm-submenu">`; (configLayout.tabs || []).forEach(tab => { const cats = [...new Set(allBookmarks.filter(b => b.tab.toUpperCase() === tab).map(b => b.category.toUpperCase()))].sort(); h += `<div class="px-3 py-1 text-[9px] font-black bg-slate-50 text-slate-400 uppercase">${tab}</div>`; cats.forEach(c => h += `<div onclick="moveBookmarkTo('${tab}','${c}')" class="px-4 py-1.5 hover:bg-blue-50 text-[11px] font-bold text-slate-600 cursor-pointer border-b">↳ ${c}</div>`); }); m.innerHTML = h + `</div></div>`; m.style.display = 'block'; m.style.left = e.pageX + 'px'; m.style.top = e.pageY + 'px'; };
     window.showCatMenu = (e, c) => { e.preventDefault(); e.stopPropagation(); selCat = c; const m = document.getElementById('ctx-menu'); let h = `<div class="px-3 py-1 text-[10px] font-bold text-slate-400 border-b mb-1 uppercase">${c}</div><div onclick="openAllInCategory()" class="cm-item text-blue-600"><span>🌍</span> OUVRIR TOUT</div><div class="cm-item cm-has-sub"><span>➡</span> DÉPLACER VERS ONGLETS...<div class="cm-submenu">`; (configLayout.tabs || []).forEach(t => h += `<div onclick="moveCat('${t}')" class="px-4 py-1.5 hover:bg-blue-50 text-[11px] font-bold text-slate-600 cursor-pointer border-b">${t}</div>`); m.innerHTML = h + `</div></div>`; m.style.display = 'block'; m.style.left = e.pageX + 'px'; m.style.top = e.pageY + 'px'; };
 
     window.moveBookmarkTo = async (t, c) => { await updateDoc(doc(db, "bookmarks", selId), { tab: t, category: c }); hideMenus(); };
+    window.addFakeBookmarkSeparator = async () => {
+      const source = allBookmarks.find(x => x.id === selId);
+      if (!source) return;
+
+      await addDoc(collection(db, 'bookmarks'), {
+        title: '---------------',
+        url: 'about:blank#separator',
+        tab: source.tab,
+        category: source.category,
+        createdAt: new Date()
+      });
+      hideMenus();
+    };
     window.moveCat = async (t) => { const batch = writeBatch(db); allBookmarks.filter(b => b.tab.toUpperCase() === currentTab && b.category.toUpperCase() === selCat).forEach(f => batch.update(doc(db, "bookmarks", f.id), { tab: t.toUpperCase() })); await batch.commit(); hideMenus(); };
     window.cmAction = async (a) => { if(a === 'delete' && confirm('SUPPRIMER ?')) await deleteDoc(doc(db, "bookmarks", selId)); if(a === 'rename') { const b = allBookmarks.find(x => x.id === selId); const n = prompt("NOM :", b.title); if(n) await updateDoc(doc(db, "bookmarks", selId), { title: n.trim() }); } hideMenus(); };
     window.addNewTab = async () => { const n = prompt("NOM :"); if(n) { if(!configLayout.tabs) configLayout.tabs = []; configLayout.tabs.push(n.toUpperCase()); await setDoc(doc(db, "config", "layout"), configLayout, { merge: true }); setTab(n.toUpperCase()); } };
