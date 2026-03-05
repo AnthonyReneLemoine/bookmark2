@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MANAGER V41</title>
+  <link rel="icon" type="image/png" href="bookmark-43-240.png">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+  <style>
+    body { font-family: -apple-system, system-ui, sans-serif; background: #f8fafc; padding-bottom: 60px; user-select: none; }
+    #initial-loader { position: fixed; inset: 0; background: white; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .spinner { width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top-color: #3b82f6; border-radius: 50%; animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Style V128 Header */
+    #tabs-bar button.tab-btn { text-transform: uppercase; letter-spacing: 0.5px; font-size: 11px; font-weight: 700; padding: 10px 18px; border-radius: 8px 8px 0 0; margin-right: 2px; transition: 0.2s; white-space: nowrap; color: #64748b; background: #f1f5f9; cursor: pointer; border-bottom: 3px solid transparent; }
+    .tab-active { border-bottom: 3px solid #2563eb !important; color: #2563eb !important; background: white !important; }
+    
+    .masonry-col { display: flex; flex-direction: column; gap: 20px; min-height: 200px; padding-bottom: 100px; }
+    .cat-card { background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; height: fit-content; overflow: hidden; }
+    .cat-header { padding: 10px 14px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-weight: 600; color: #475569; display: flex; justify-content: space-between; align-items: center; cursor: grab; }
+    .cat-header span { text-transform: uppercase; letter-spacing: 0.5px; font-size: 11px; }
+
+    .bookmark-item { padding: 8px 12px; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; cursor: pointer; background: white; }
+    .bookmark-item:hover { background: #f8fafc; }
+    .favicon { width: 14px; height: 14px; margin-right: 10px; border-radius: 2px; }
+    .bm-link { flex: 1; font-size: 12px; color: #334155; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    #sync-badge { font-size: 9px; font-weight: 800; padding: 2px 8px; border-radius: 9999px; text-transform: uppercase; }
+    .sync-ok { background: #064e3b; color: #6ee7b7; border: 1px solid #065f46; }
+    .sync-err { background: #7f1d1d; color: #fecaca; border: 1px solid #991b1b; }
+    .sync-load { background: #78350f; color: #fde68a; border: 1px solid #92400e; }
+
+    .ctx-menu { position: fixed; z-index: 1000; width: 220px; background: white; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1); padding: 5px; display: none; }
+    .cm-item { padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; color: #334155; display: flex; align-items: center; gap: 8px; }
+    .cm-item:hover { background: #f1f5f9; color: #2563eb; }
+    .cm-submenu { position: absolute; left: 100%; top: -5px; width: 180px; background: white; border: 1px solid #e2e8f0; border-radius: 8px; display: none; padding: 4px; box-shadow: 0 10px 15px rgba(0,0,0,0.1); }
+    .cm-has-sub:hover > .cm-submenu { display: block; }
+
+    .edit-mode .masonry-col { border: 2px dashed #3b82f6; background: rgba(59, 130, 246, 0.02); }
+    .ghost { opacity: 0.1; background: #3b82f6 !important; border: 1px dashed #3b82f6 !important; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+  </style>
+</head>
+<body>
+
+  <div id="initial-loader"><div class="spinner"></div></div>
+
+  <header class="bg-slate-900 text-white sticky top-0 z-50">
+    <div class="max-w-[1600px] mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center gap-4">
+          <h1 class="text-lg font-black tracking-tighter italic text-blue-400">V41</h1>
+          <div id="sync-badge" class="sync-ok">SYNC: OK</div>
+      </div>
+
+      <div class="flex items-center gap-3 bg-slate-800 p-1 rounded-full px-4 border border-slate-700">
+          <div class="flex items-center gap-2 pr-4 border-r border-slate-700">
+            <span class="text-[9px] font-black text-slate-500 uppercase">ÉDITION</span>
+            <input type="checkbox" id="edit-toggle" class="sr-only peer" onchange="toggleEditMode()">
+            <div onclick="document.getElementById('edit-toggle').click()" class="w-8 h-4 bg-slate-600 rounded-full relative cursor-pointer peer-checked:bg-blue-500 transition-all after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:after:translate-x-4"></div>
+          </div>
+          <div class="flex gap-4">
+            <button onclick="globalCollapse(true)" class="text-[9px] font-bold text-slate-400 hover:text-white">COLLAPSE</button>
+            <button onclick="globalCollapse(false)" class="text-[9px] font-bold text-slate-400 hover:text-white">EXPAND</button>
+          </div>
+          <div class="flex items-center gap-1 ml-2">
+            <button onclick="setColumns(2)" id="btn-col-2" class="w-6 h-6 rounded text-[10px] font-bold hover:bg-slate-700">2</button>
+            <button onclick="setColumns(3)" id="btn-col-3" class="w-6 h-6 rounded text-[10px] font-bold hover:bg-slate-700">3</button>
+          </div>
+      </div>
+
+      <div class="flex gap-3 items-center">
+        <button id="save-config-btn" onclick="manualSave()" class="hidden bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg transition-all">💾 SAVE CONFIG</button>
+        <input type="text" id="search" placeholder="RECHERCHE..." class="bg-slate-800 px-4 py-1.5 rounded-full text-xs w-32 focus:w-48 outline-none border border-transparent focus:border-blue-500 transition-all">
+        <button onclick="openAddModal()" class="bg-blue-600 hover:bg-blue-700 px-5 py-1.5 rounded-full text-xs font-bold shadow-md">+ ADD</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="bg-white border-b sticky top-[52px] z-40 pt-2">
+    <div class="max-w-[1600px] mx-auto px-4 flex items-center">
+      <div id="tabs-bar" class="flex overflow-x-auto no-scrollbar flex-1"></div>
+    </div>
+  </div>
+
+  <main class="max-w-[1600px] mx-auto p-6 min-h-screen">
+    <div id="main-content" class="flex gap-6 justify-center"></div>
+  </main>
+
+  <div id="ctx-menu" class="ctx-menu"></div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getFirestore, collection, onSnapshot, query, doc, setDoc, deleteDoc, updateDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyC6o44PrBjcE-0jy4HnXMavCdzvHG0es7w",
+      authDomain: "bookmark-1a4f4.firebaseapp.com",
+      projectId: "bookmark-1a4f4",
+      storageBucket: "bookmark-1a4f4.firebasestorage.app",
+      messagingSenderId: "791945118925",
+      appId: "1:791945118925:web:66ed56c79c5c8182d81584"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    
+    let allBookmarks = [], configLayout = {}, currentTab = localStorage.getItem('lastTabV38') || "";
+    let isEditing = false, sortableInstances = [];
+    let selId = null, selCat = null, selTabName = null;
+
+    function setSync(state) {
+        const b = document.getElementById('sync-badge');
+        if(state === 'load') { b.innerText = "SYNC..."; b.className = "sync-load"; }
+        else if(state === 'err') { b.innerText = "ERREUR"; b.className = "sync-err"; }
+        else { b.innerText = "SYNC: OK"; b.className = "sync-ok"; }
+    }
+
+    // --- ECOUTEURS FIREBASE ---
+    onSnapshot(doc(db, "config", "layout"), (s) => { 
+        if(s.exists() && !isEditing) { configLayout = s.data(); refreshUI(); } 
+    });
+
+    onSnapshot(query(collection(db, "bookmarks")), (s) => { 
+        if(!isEditing) { allBookmarks = s.docs.map(d => ({id: d.id, ...d.data()})); refreshUI(); } 
+    });
+
+    function refreshUI() {
+      const rawTabs = [...new Set(allBookmarks.map(b => b.tab.toUpperCase()))];
+      let tabs = configLayout.tabs || [];
+      rawTabs.forEach(t => { if(!tabs.includes(t)) tabs.push(t); });
+      if (!currentTab || !tabs.includes(currentTab)) currentTab = tabs[0] || "";
+      
+      renderTabs(tabs);
+      renderContent();
+      document.getElementById('initial-loader').style.display = 'none';
+    }
+
+    function renderTabs(tabs) {
+      const bar = document.getElementById('tabs-bar');
+      bar.innerHTML = tabs.map(t => `<button data-id="${t}" onclick="setTab('${t}')" oncontextmenu="showTabMenu(event, '${t}')" class="tab-btn ${t === currentTab ? 'tab-active' : ''}">${t}</button>`).join('') + `<button onclick="addNewTab()" class="add-tab-btn">+</button>`;
+      
+      new Sortable(bar, { animation: 150, draggable: '.tab-btn', onEnd: () => {
+        configLayout.tabs = Array.from(bar.querySelectorAll('.tab-btn')).map(btn => btn.dataset.id);
+        manualSave(); 
+      }});
+    }
+
+    window.setTab = (t) => { currentTab = t; localStorage.setItem('lastTabV38', t); refreshUI(); };
+
+    function normalizeColAssignment(raw, count) {
+      if (Array.isArray(raw)) return raw;
+      if (!raw || typeof raw !== 'object') return null;
+      return Array.from({length: count}, (_, i) => Array.isArray(raw[`c${i}`]) ? raw[`c${i}`] : []);
+    }
+
+    function serializeColAssignment(cols) {
+      return Object.fromEntries(cols.map((cats, i) => [`c${i}`, cats.filter(Boolean)]));
+    }
+
+    function renderContent() {
+      sortableInstances.forEach(i => i.destroy());
+      sortableInstances = [];
+      const container = document.getElementById('main-content'); container.innerHTML = '';
+      const count = configLayout.columnCount || 3;
+      
+      document.getElementById('btn-col-2').classList.toggle('bg-slate-700', count === 2);
+      document.getElementById('btn-col-3').classList.toggle('bg-slate-700', count === 3);
+
+      const filtered = allBookmarks.filter(b => b.tab.toUpperCase() === currentTab);
+      const groupsMap = filtered.reduce((acc, b) => { const cat = b.category.toUpperCase(); acc[cat] = acc[cat] || []; acc[cat].push(b); return acc; }, {});
+
+      const key = `${currentTab}_${count}`;
+      let colAssignment = normalizeColAssignment(configLayout.colMap?.[key], count);
+
+      if (!colAssignment) {
+          colAssignment = Array.from({length: count}, () => []);
+          Object.keys(groupsMap).forEach((cat, i) => colAssignment[i % count].push(cat));
+      } else {
+          const assigned = colAssignment.flat();
+          Object.keys(groupsMap).forEach(cat => { if(!assigned.includes(cat)) colAssignment[0].push(cat); });
+      }
+
+      colAssignment.forEach((cats, i) => {
+          const colDiv = document.createElement('div');
+          colDiv.className = 'masonry-col flex-1';
+          cats.filter(c => groupsMap[c]).forEach(c => colDiv.appendChild(createCategoryCard(c, groupsMap[c])));
+          container.appendChild(colDiv);
+      });
+      initSortables();
+    }
+
+    function createCategoryCard(name, bms) {
+      let order = configLayout.items?.[name] || [];
+      bms.sort((a,b) => order.indexOf(a.id) - order.indexOf(b.id));
+      const isCollapsed = configLayout.collapsed?.[(currentTab + '||' + name).toUpperCase()];
+      const card = document.createElement('div');
+      card.className = `cat-card`;
+      card.dataset.id = name;
+      card.innerHTML = `
+        <div class="cat-header" onclick="toggleCollapse('${name}')" oncontextmenu="showCatMenu(event, '${name}')">
+          <div class="flex items-center gap-2"><span>${isCollapsed ? '▶' : '▼'}</span><span>${name}</span></div>
+          <span class="text-[9px] bg-slate-100 px-2 py-0.5 rounded-full font-bold text-slate-400">${bms.length}</span>
+        </div>
+        <div class="cat-list items-container ${isCollapsed ? 'hidden' : ''}" data-cat="${name}">
+          ${bms.map(bm => `
+            <div class="bookmark-item" data-id="${bm.id}" oncontextmenu="showBookMenu(event, '${bm.id}', '${bm.title.replace(/'/g, "\\'")}')">
+              <img src="https://www.google.com/s2/favicons?domain=${new URL(bm.url).hostname}&sz=32" class="favicon">
+              <a href="${bm.url}" target="_blank" class="bm-link">${bm.title}</a>
+            </div>`).join('')}
+        </div>`;
+      return card;
+    }
+
+    async function saveCategoryOrder() {
+      if(!currentTab) return;
+
+      const count = configLayout.columnCount || 3;
+      const key = `${currentTab}_${count}`;
+      if(!configLayout.colMap) configLayout.colMap = {};
+
+      const cols = Array.from(document.querySelectorAll('.masonry-col')).map(col =>
+        Array.from(col.querySelectorAll('.cat-card')).map(card => card.dataset.id)
+      );
+      configLayout.colMap[key] = serializeColAssignment(cols);
+
+      try {
+        setSync('load');
+        const cleanLayout = JSON.parse(JSON.stringify(configLayout));
+        await setDoc(doc(db, "config", "layout"), cleanLayout, { merge: true });
+        setSync('ok');
+      } catch (e) {
+        console.error('Erreur sauvegarde ordre catégories :', e);
+        setSync('err');
+      }
+    }
+
+    function initSortables() {
+      document.querySelectorAll('.masonry-col').forEach(el => {
+        sortableInstances.push(new Sortable(el, {
+          group: 'categories',
+          animation: 150,
+          handle: '.cat-header',
+          ghostClass: 'ghost',
+          forceFallback: true,
+          onEnd: saveCategoryOrder
+        }));
+      });
+      document.querySelectorAll('.items-container').forEach(el => {
+        sortableInstances.push(new Sortable(el, { group: 'bookmarks', animation: 150, ghostClass: 'ghost', onEnd: async (evt) => {
+            if (!isEditing && evt.from !== evt.to) {
+                await updateDoc(doc(db, "bookmarks", evt.item.dataset.id), { category: evt.to.dataset.cat.toUpperCase() });
+            }
+        }}));
+      });
+    }
+
+    // --- MODE EDITION ---
+    window.toggleEditMode = () => {
+      isEditing = document.getElementById('edit-toggle').checked;
+      document.body.classList.toggle('edit-mode', isEditing);
+      document.getElementById('save-config-btn').classList.toggle('hidden', !isEditing);
+      if (!isEditing) location.reload();
+    };
+
+    // --- SAUVEGARDE ULTRA-ROBUSTE ---
+    window.manualSave = async () => {
+      setSync('load');
+      const btn = document.getElementById('save-config-btn');
+      btn.disabled = true;
+
+      const count = configLayout.columnCount || 3;
+      const key = `${currentTab}_${count}`;
+      
+      try {
+        // 1. Scan des colonnes
+        if(!configLayout.colMap) configLayout.colMap = {};
+        const newCols = Array.from(document.querySelectorAll('.masonry-col')).map(col => 
+            Array.from(col.querySelectorAll('.cat-card')).map(g => g.dataset.id)
+        );
+        configLayout.colMap[key] = serializeColAssignment(newCols);
+
+        // 2. Scan de l'ordre interne
+        if(!configLayout.items) configLayout.items = {};
+        document.querySelectorAll('.items-container').forEach(el => {
+            configLayout.items[el.dataset.cat] = Array.from(el.querySelectorAll('.bookmark-item')).map(c => c.dataset.id);
+        });
+
+        // 3. NETTOYAGE CRITIQUE : Supprimer les undefined et transformer en JSON pur
+        const cleanLayout = JSON.parse(JSON.stringify(configLayout));
+
+        await setDoc(doc(db, "config", "layout"), cleanLayout, { merge: true });
+        
+        btn.innerText = "✅ SAUVÉ";
+        setTimeout(() => {
+          document.getElementById('edit-toggle').checked = false;
+          toggleEditMode();
+          btn.disabled = false;
+          btn.innerText = "💾 SAVE CONFIG";
+          setSync('ok');
+        }, 800);
+      } catch (e) {
+        console.error("Firebase Error:", e);
+        setSync('err');
+        btn.innerText = "❌ ERREUR";
+        btn.disabled = false;
+      }
+    };
+
+    // --- ACTIONS ---
+    window.toggleCollapse = async (cat) => {
+        const k = (currentTab + '||' + cat).toUpperCase();
+        if(!configLayout.collapsed) configLayout.collapsed = {};
+        configLayout.collapsed[k] = !configLayout.collapsed[k];
+        renderContent();
+        await setDoc(doc(db, "config", "layout"), configLayout, { merge: true });
+    };
+
+    window.globalCollapse = async (s) => {
+        const cats = [...new Set(allBookmarks.filter(b => b.tab.toUpperCase() === currentTab).map(b => b.category.toUpperCase()))];
+        if(!configLayout.collapsed) configLayout.collapsed = {};
+        cats.forEach(c => { configLayout.collapsed[(currentTab + '||' + c).toUpperCase()] = s; });
+        renderContent();
+        await setDoc(doc(db, "config", "layout"), configLayout, { merge: true });
+    };
+
+    window.showTabMenu = (e, t) => { e.preventDefault(); e.stopPropagation(); selTabName = t; const m = document.getElementById('ctx-menu'); m.innerHTML = `<div class="px-3 py-1 text-[10px] font-bold text-slate-400 border-b mb-1 uppercase">${t}</div><div onclick="deleteCurrentTab()" class="cm-item text-red-500"><span>✕</span> SUPPRIMER</div>`; m.style.display = 'block'; m.style.left = e.pageX + 'px'; m.style.top = e.pageY + 'px'; };
+    window.showBookMenu = (e, id, t) => { e.preventDefault(); e.stopPropagation(); selId = id; const m = document.getElementById('ctx-menu'); let h = `<div class="px-3 py-1 text-[10px] font-bold text-slate-400 border-b mb-1 uppercase truncate">${t}</div><div onclick="cmAction('rename')" class="cm-item"><span>✎</span> RENOMMER</div><div onclick="cmAction('delete')" class="cm-item text-red-500"><span>✕</span> SUPPRIMER</div><div class="cm-item cm-has-sub"><span>➡</span> DÉPLACER VERS...<div class="cm-submenu">`; (configLayout.tabs || []).forEach(tab => { const cats = [...new Set(allBookmarks.filter(b => b.tab.toUpperCase() === tab).map(b => b.category.toUpperCase()))].sort(); h += `<div class="px-3 py-1 text-[9px] font-black bg-slate-50 text-slate-400 uppercase">${tab}</div>`; cats.forEach(c => h += `<div onclick="moveBookmarkTo('${tab}','${c}')" class="px-4 py-1.5 hover:bg-blue-50 text-[11px] font-bold text-slate-600 cursor-pointer border-b">↳ ${c}</div>`); }); m.innerHTML = h + `</div></div>`; m.style.display = 'block'; m.style.left = e.pageX + 'px'; m.style.top = e.pageY + 'px'; };
+    window.showCatMenu = (e, c) => { e.preventDefault(); e.stopPropagation(); selCat = c; const m = document.getElementById('ctx-menu'); let h = `<div class="px-3 py-1 text-[10px] font-bold text-slate-400 border-b mb-1 uppercase">${c}</div><div onclick="openAllInCategory()" class="cm-item text-blue-600"><span>🌍</span> OUVRIR TOUT</div><div class="cm-item cm-has-sub"><span>➡</span> DÉPLACER VERS ONGLETS...<div class="cm-submenu">`; (configLayout.tabs || []).forEach(t => h += `<div onclick="moveCat('${t}')" class="px-4 py-1.5 hover:bg-blue-50 text-[11px] font-bold text-slate-600 cursor-pointer border-b">${t}</div>`); m.innerHTML = h + `</div></div>`; m.style.display = 'block'; m.style.left = e.pageX + 'px'; m.style.top = e.pageY + 'px'; };
+
+    window.moveBookmarkTo = async (t, c) => { await updateDoc(doc(db, "bookmarks", selId), { tab: t, category: c }); hideMenus(); };
+    window.moveCat = async (t) => { const batch = writeBatch(db); allBookmarks.filter(b => b.tab.toUpperCase() === currentTab && b.category.toUpperCase() === selCat).forEach(f => batch.update(doc(db, "bookmarks", f.id), { tab: t.toUpperCase() })); await batch.commit(); hideMenus(); };
+    window.cmAction = async (a) => { if(a === 'delete' && confirm('SUPPRIMER ?')) await deleteDoc(doc(db, "bookmarks", selId)); if(a === 'rename') { const b = allBookmarks.find(x => x.id === selId); const n = prompt("NOM :", b.title); if(n) await updateDoc(doc(db, "bookmarks", selId), { title: n.trim() }); } hideMenus(); };
+    window.addNewTab = async () => { const n = prompt("NOM :"); if(n) { if(!configLayout.tabs) configLayout.tabs = []; configLayout.tabs.push(n.toUpperCase()); await setDoc(doc(db, "config", "layout"), configLayout, { merge: true }); setTab(n.toUpperCase()); } };
+    window.deleteCurrentTab = async () => { if(confirm("Supprimer l'onglet ?")) { const batch = writeBatch(db); allBookmarks.filter(b => b.tab.toUpperCase() === selTabName.toUpperCase()).forEach(f => batch.delete(doc(db, "bookmarks", f.id))); configLayout.tabs = configLayout.tabs.filter(t => t !== selTabName); await setDoc(doc(db, "config", "layout"), configLayout); refreshUI(); hideMenus(); } };
+    window.openAllInCategory = () => { allBookmarks.filter(b => b.tab.toUpperCase() === currentTab && b.category.toUpperCase() === selCat).forEach(f => window.open(f.url, '_blank')); hideMenus(); };
+    
+    function hideMenus() { document.getElementById('ctx-menu').style.display = 'none'; }
+    document.addEventListener('click', hideMenus);
+    window.setColumns = async (c) => { configLayout.columnCount = c; renderContent(); await setDoc(doc(db, "config", "layout"), configLayout, { merge: true }); };
+    window.openAddModal = () => window.open('add.html', 'Ajout', 'width=450,height=650');
+
+    document.getElementById('search').addEventListener('keyup', (e) => {
+        const v = e.target.value.toLowerCase();
+        document.querySelectorAll('.bookmark-item').forEach(el => el.style.display = el.innerText.toLowerCase().includes(v) ? 'flex' : 'none');
+    });
+  </script>
+</body>
+</html>
