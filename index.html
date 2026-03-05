@@ -191,9 +191,7 @@
       initSortables();
     }
 
-    function isFakeSeparator(bm) {
-      return bm?.title === '---------------';
-    }
+    function isFakeSeparator(bm) { return bm?.title === '---------------'; }
 
     function createCategoryCard(name, bms) {
       let order = configLayout.items?.[name] || [];
@@ -210,19 +208,19 @@
         <div class="cat-list items-container ${isCollapsed ? 'hidden' : ''}" data-cat="${name}">
           ${bms.map(bm => {
             const safeTitle = (bm.title || '').replace(/'/g, "\\'");
-            if (isFakeSeparator(bm)) {
-              return `
-                <div class="bookmark-item" data-id="${bm.id}" oncontextmenu="showBookMenu(event, '${bm.id}', '${safeTitle}')">
-                  <span class="bm-link text-slate-300 font-bold tracking-wider text-center">${bm.title}</span>
-                </div>`;
-            }
+            const sep = isFakeSeparator(bm);
+            const hostname = sep ? '' : new URL(bm.url).hostname;
+            const icon = sep
+              ? `<span class="favicon bg-transparent"></span>`
+              : `<img src="https://www.google.com/s2/favicons?domain=${hostname}&sz=32" class="favicon">`;
+            const link = sep
+              ? `<a href="javascript:void(0)" onclick="event.preventDefault()" class="bm-link text-slate-300 font-bold tracking-wider text-center">${bm.title}</a>`
+              : `<a href="${bm.url}" target="_blank" class="bm-link">${bm.title}</a>`;
 
-            let hostname = '';
-            try { hostname = new URL(bm.url).hostname; } catch (_) {}
             return `
               <div class="bookmark-item" data-id="${bm.id}" oncontextmenu="showBookMenu(event, '${bm.id}', '${safeTitle}')">
-                <img src="https://www.google.com/s2/favicons?domain=${hostname}&sz=32" class="favicon">
-                <a href="${bm.url}" target="_blank" class="bm-link">${bm.title}</a>
+                ${icon}
+                ${link}
               </div>`;
           }).join('')}
         </div>`;
