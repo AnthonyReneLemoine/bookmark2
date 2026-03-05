@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MANAGER V43</title>
+  <title>MANAGER V41</title>
   <link rel="icon" type="image/png" href="bookmark-43-240.png">
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
@@ -49,7 +49,7 @@
   <header class="bg-slate-900 text-white sticky top-0 z-50">
     <div class="max-w-[1600px] mx-auto px-4 py-3 flex justify-between items-center">
       <div class="flex items-center gap-4">
-          <h1 class="text-lg font-black tracking-tighter italic text-blue-400">V43</h1>
+          <h1 class="text-lg font-black tracking-tighter italic text-blue-400">MANAGER</h1>
           <div id="sync-badge" class="sync-ok">SYNC: OK</div>
       </div>
 
@@ -105,8 +105,7 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
     
-    let allBookmarks = [], configLayout = { tabs: [], colMap: {}, items: {}, collapsed: {}, columnCount: 3 };
-    let currentTab = localStorage.getItem('lastTabV43') || "";
+    let allBookmarks = [], configLayout = {}, currentTab = localStorage.getItem('lastTab') || "";
     let isEditing = false, sortableInstances = [];
     let selId = null, selCat = null, selTabName = null;
 
@@ -117,23 +116,12 @@
         else { b.innerText = "SYNC: OK"; b.className = "sync-ok"; }
     }
 
-    // Nettoyage récursif pour Firebase (supprime les undefined)
-    function cleanForFirebase(obj) {
-      return JSON.parse(JSON.stringify(obj, (key, value) => value === undefined ? null : value));
-    }
-
     onSnapshot(doc(db, "config", "layout"), (s) => { 
-        if(s.exists() && !isEditing) { 
-            configLayout = { ...configLayout, ...s.data() }; 
-            refreshUI(); 
-        } 
+        if(s.exists() && !isEditing) { configLayout = s.data(); refreshUI(); } 
     });
 
     onSnapshot(query(collection(db, "bookmarks")), (s) => { 
-        if(!isEditing) { 
-            allBookmarks = s.docs.map(d => ({id: d.id, ...d.data()})); 
-            refreshUI(); 
-        } 
+        if(!isEditing) { allBookmarks = s.docs.map(d => ({id: d.id, ...d.data()})); refreshUI(); } 
     });
 
     function refreshUI() {
@@ -157,7 +145,7 @@
       }});
     }
 
-    window.setTab = (t) => { currentTab = t; localStorage.setItem('lastTabV43', t); refreshUI(); };
+    window.setTab = (t) => { currentTab = t; localStorage.setItem('lastTab', t); refreshUI(); };
 
     function normalizeColAssignment(raw, count) {
       if (Array.isArray(raw)) return raw;
@@ -214,20 +202,24 @@
           <span class="text-[9px] bg-slate-100 px-2 py-0.5 rounded-full font-bold text-slate-400">${bms.length}</span>
         </div>
         <div class="cat-list items-container ${isCollapsed ? 'hidden' : ''}" data-cat="${name}">
-          ${bms.map(bm => `
+          ${bms.map(bm => {
+            if (bm.title === "---------------") {
+                return `<div class="h-px bg-slate-200 my-2.5 mx-4" oncontextmenu="showBookMenu(event, '${bm.id}', 'SÉPARATEUR')"></div>`;
+            }
+            return `
             <div class="bookmark-item" data-id="${bm.id}" oncontextmenu="showBookMenu(event, '${bm.id}', '${bm.title.replace(/'/g, "\\'")}')">
               <img src="https://www.google.com/s2/favicons?domain=${new URL(bm.url).hostname}&sz=32" class="favicon">
               <a href="${bm.url}" target="_blank" class="bm-link">${bm.title}</a>
-            </div>`).join('')}
+            </div>`}).join('')}
         </div>`;
       return card;
     }
 
     async function saveCategoryOrder() {
       if(!currentTab) return;
+
       const count = configLayout.columnCount || 3;
       const key = `${currentTab}_${count}`;
-      
       if(!configLayout.colMap) configLayout.colMap = {};
 
       const cols = Array.from(document.querySelectorAll('.masonry-col')).map(col =>
@@ -237,10 +229,11 @@
 
       try {
         setSync('load');
-        await setDoc(doc(db, "config", "layout"), cleanForFirebase(configLayout), { merge: true });
+        const cleanLayout = JSON.parse(JSON.stringify(configLayout));
+        await setDoc(doc(db, "config", "layout"), cleanLayout, { merge: true });
         setSync('ok');
       } catch (e) {
-        console.error('Erreur sauvegarde catégories:', e);
+        console.error('Erreur sauvegarde ordre catégories :', e);
         setSync('err');
       }
     }
@@ -258,12 +251,8 @@
       });
       document.querySelectorAll('.items-container').forEach(el => {
         sortableInstances.push(new Sortable(el, { group: 'bookmarks', animation: 150, ghostClass: 'ghost', onEnd: async (evt) => {
-            if (evt.from !== evt.to) {
-                try {
-                    setSync('load');
-                    await updateDoc(doc(db, "bookmarks", evt.item.dataset.id), { category: evt.to.dataset.cat.toUpperCase() });
-                    setSync('ok');
-                } catch(e) { setSync('err'); }
+            if (!isEditing && evt.from !== evt.to) {
+                await updateDoc(doc(db, "bookmarks", evt.item.dataset.id), { category: evt.to.dataset.cat.toUpperCase() });
             }
         }}));
       });
@@ -273,7 +262,7 @@
       isEditing = document.getElementById('edit-toggle').checked;
       document.body.classList.toggle('edit-mode', isEditing);
       document.getElementById('save-config-btn').classList.toggle('hidden', !isEditing);
-      if (!isEditing) refreshUI();
+      if (!isEditing) location.reload();
     };
 
     window.manualSave = async () => {
@@ -296,7 +285,8 @@
             configLayout.items[el.dataset.cat] = Array.from(el.querySelectorAll('.bookmark-item')).map(c => c.dataset.id);
         });
 
-        await setDoc(doc(db, "config", "layout"), cleanForFirebase(configLayout), { merge: true });
+        const cleanLayout = JSON.parse(JSON.stringify(configLayout));
+        await setDoc(doc(db, "config", "layout"), cleanLayout, { merge: true });
         
         btn.innerText = "✅ SAUVÉ";
         setTimeout(() => {
@@ -319,7 +309,7 @@
         if(!configLayout.collapsed) configLayout.collapsed = {};
         configLayout.collapsed[k] = !configLayout.collapsed[k];
         renderContent();
-        await setDoc(doc(db, "config", "layout"), cleanForFirebase(configLayout), { merge: true });
+        await setDoc(doc(db, "config", "layout"), configLayout, { merge: true });
     };
 
     window.globalCollapse = async (s) => {
@@ -327,23 +317,65 @@
         if(!configLayout.collapsed) configLayout.collapsed = {};
         cats.forEach(c => { configLayout.collapsed[(currentTab + '||' + c).toUpperCase()] = s; });
         renderContent();
-        await setDoc(doc(db, "config", "layout"), cleanForFirebase(configLayout), { merge: true });
+        await setDoc(doc(db, "config", "layout"), configLayout, { merge: true });
     };
 
     window.showTabMenu = (e, t) => { e.preventDefault(); e.stopPropagation(); selTabName = t; const m = document.getElementById('ctx-menu'); m.innerHTML = `<div class="px-3 py-1 text-[10px] font-bold text-slate-400 border-b mb-1 uppercase">${t}</div><div onclick="deleteCurrentTab()" class="cm-item text-red-500"><span>✕</span> SUPPRIMER</div>`; m.style.display = 'block'; m.style.left = e.pageX + 'px'; m.style.top = e.pageY + 'px'; };
-    window.showBookMenu = (e, id, t) => { e.preventDefault(); e.stopPropagation(); selId = id; const m = document.getElementById('ctx-menu'); let h = `<div class="px-3 py-1 text-[10px] font-bold text-slate-400 border-b mb-1 uppercase truncate">${t}</div><div onclick="cmAction('rename')" class="cm-item"><span>✎</span> RENOMMER</div><div onclick="cmAction('delete')" class="cm-item text-red-500"><span>✕</span> SUPPRIMER</div><div class="cm-item cm-has-sub"><span>➡</span> DÉPLACER VERS...<div class="cm-submenu">`; (configLayout.tabs || []).forEach(tab => { const cats = [...new Set(allBookmarks.filter(b => b.tab.toUpperCase() === tab).map(b => b.category.toUpperCase()))].sort(); h += `<div class="px-3 py-1 text-[9px] font-black bg-slate-50 text-slate-400 uppercase">${tab}</div>`; cats.forEach(c => h += `<div onclick="moveBookmarkTo('${tab}','${c}')" class="px-4 py-1.5 hover:bg-blue-50 text-[11px] font-bold text-slate-600 cursor-pointer border-b">↳ ${c}</div>`); }); m.innerHTML = h + `</div></div>`; m.style.display = 'block'; m.style.left = e.pageX + 'px'; m.style.top = e.pageY + 'px'; };
+    
+    window.showBookMenu = (e, id, t) => { 
+        e.preventDefault(); 
+        e.stopPropagation(); 
+        selId = id; 
+        const m = document.getElementById('ctx-menu'); 
+        let h = `<div class="px-3 py-1 text-[10px] font-bold text-slate-400 border-b mb-1 uppercase truncate">${t}</div><div onclick="cmAction('rename')" class="cm-item"><span>✎</span> RENOMMER</div><div onclick="cmAction('delete')" class="cm-item text-red-500"><span>✕</span> SUPPRIMER</div><div onclick="cmAction('addSeparator')" class="cm-item border-t mt-1 pt-1 text-blue-600"><span>➕</span> AJOUTER SÉPARATEUR</div><div class="cm-item cm-has-sub"><span>➡</span> DÉPLACER VERS...<div class="cm-submenu">`; 
+        (configLayout.tabs || []).forEach(tab => { 
+            const cats = [...new Set(allBookmarks.filter(b => b.tab.toUpperCase() === tab).map(b => b.category.toUpperCase()))].sort(); 
+            h += `<div class="px-3 py-1 text-[9px] font-black bg-slate-50 text-slate-400 uppercase">${tab}</div>`; 
+            cats.forEach(c => h += `<div onclick="moveBookmarkTo('${tab}','${c}')" class="px-4 py-1.5 hover:bg-blue-50 text-[11px] font-bold text-slate-600 cursor-pointer border-b">↳ ${c}</div>`); 
+        }); 
+        m.innerHTML = h + `</div></div>`; 
+        m.style.display = 'block'; 
+        m.style.left = e.pageX + 'px'; 
+        m.style.top = e.pageY + 'px'; 
+    };
+
     window.showCatMenu = (e, c) => { e.preventDefault(); e.stopPropagation(); selCat = c; const m = document.getElementById('ctx-menu'); let h = `<div class="px-3 py-1 text-[10px] font-bold text-slate-400 border-b mb-1 uppercase">${c}</div><div onclick="openAllInCategory()" class="cm-item text-blue-600"><span>🌍</span> OUVRIR TOUT</div><div class="cm-item cm-has-sub"><span>➡</span> DÉPLACER VERS ONGLETS...<div class="cm-submenu">`; (configLayout.tabs || []).forEach(t => h += `<div onclick="moveCat('${t}')" class="px-4 py-1.5 hover:bg-blue-50 text-[11px] font-bold text-slate-600 cursor-pointer border-b">${t}</div>`); m.innerHTML = h + `</div></div>`; m.style.display = 'block'; m.style.left = e.pageX + 'px'; m.style.top = e.pageY + 'px'; };
 
     window.moveBookmarkTo = async (t, c) => { await updateDoc(doc(db, "bookmarks", selId), { tab: t, category: c }); hideMenus(); };
     window.moveCat = async (t) => { const batch = writeBatch(db); allBookmarks.filter(b => b.tab.toUpperCase() === currentTab && b.category.toUpperCase() === selCat).forEach(f => batch.update(doc(db, "bookmarks", f.id), { tab: t.toUpperCase() })); await batch.commit(); hideMenus(); };
-    window.cmAction = async (a) => { if(a === 'delete' && confirm('SUPPRIMER ?')) await deleteDoc(doc(db, "bookmarks", selId)); if(a === 'rename') { const b = allBookmarks.find(x => x.id === selId); const n = prompt("NOM :", b.title); if(n) await updateDoc(doc(db, "bookmarks", selId), { title: n.trim() }); } hideMenus(); };
-    window.addNewTab = async () => { const n = prompt("NOM :"); if(n) { if(!configLayout.tabs) configLayout.tabs = []; configLayout.tabs.push(n.toUpperCase()); await setDoc(doc(db, "config", "layout"), cleanForFirebase(configLayout), { merge: true }); setTab(n.toUpperCase()); } };
-    window.deleteCurrentTab = async () => { if(confirm("Supprimer l'onglet ?")) { const batch = writeBatch(db); allBookmarks.filter(b => b.tab.toUpperCase() === selTabName.toUpperCase()).forEach(f => batch.delete(doc(db, "bookmarks", f.id))); configLayout.tabs = configLayout.tabs.filter(t => t !== selTabName); await setDoc(doc(db, "config", "layout"), cleanForFirebase(configLayout)); refreshUI(); hideMenus(); } };
+    
+    window.cmAction = async (a) => { 
+        if(a === 'delete' && confirm('SUPPRIMER ?')) await deleteDoc(doc(db, "bookmarks", selId)); 
+        if(a === 'rename') { 
+            const b = allBookmarks.find(x => x.id === selId); 
+            const n = prompt("NOM :", b.title); 
+            if(n) await updateDoc(doc(db, "bookmarks", selId), { title: n.trim() }); 
+        } 
+        if(a === 'addSeparator') {
+            const ref = allBookmarks.find(x => x.id === selId);
+            if(ref) {
+                setSync('load');
+                try {
+                    await setDoc(doc(collection(db, "bookmarks")), {
+                        title: "---------------",
+                        url: "https://separator",
+                        tab: ref.tab.toUpperCase(),
+                        category: ref.category.toUpperCase()
+                    });
+                    setSync('ok');
+                } catch(e) { setSync('err'); }
+            }
+        }
+        hideMenus(); 
+    };
+
+    window.addNewTab = async () => { const n = prompt("NOM :"); if(n) { if(!configLayout.tabs) configLayout.tabs = []; configLayout.tabs.push(n.toUpperCase()); await setDoc(doc(db, "config", "layout"), configLayout, { merge: true }); setTab(n.toUpperCase()); } };
+    window.deleteCurrentTab = async () => { if(confirm("Supprimer l'onglet ?")) { const batch = writeBatch(db); allBookmarks.filter(b => b.tab.toUpperCase() === selTabName.toUpperCase()).forEach(f => batch.delete(doc(db, "bookmarks", f.id))); configLayout.tabs = configLayout.tabs.filter(t => t !== selTabName); await setDoc(doc(db, "config", "layout"), configLayout); refreshUI(); hideMenus(); } };
     window.openAllInCategory = () => { allBookmarks.filter(b => b.tab.toUpperCase() === currentTab && b.category.toUpperCase() === selCat).forEach(f => window.open(f.url, '_blank')); hideMenus(); };
     
     function hideMenus() { document.getElementById('ctx-menu').style.display = 'none'; }
     document.addEventListener('click', hideMenus);
-    window.setColumns = async (c) => { configLayout.columnCount = c; renderContent(); await setDoc(doc(db, "config", "layout"), cleanForFirebase(configLayout), { merge: true }); };
+    window.setColumns = async (c) => { configLayout.columnCount = c; renderContent(); await setDoc(doc(db, "config", "layout"), configLayout, { merge: true }); };
     window.openAddModal = () => window.open('add.html', 'Ajout', 'width=450,height=650');
 
     document.getElementById('search').addEventListener('keyup', (e) => {
