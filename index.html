@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MANAGER V43</title>
+  <title>MANAGER V44</title>
   <link rel="icon" type="image/png" href="bookmark-43-240.png">
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
@@ -49,7 +49,7 @@
   <header class="bg-slate-900 text-white sticky top-0 z-50">
     <div class="max-w-[1600px] mx-auto px-4 py-3 flex justify-between items-center">
       <div class="flex items-center gap-4">
-          <h1 class="text-lg font-black tracking-tighter italic text-blue-400">MANAGER V43</h1>
+          <h1 class="text-lg font-black tracking-tighter italic text-blue-400">MANAGER V44</h1>
           <div id="sync-badge" class="sync-ok">SYNC: OK</div>
       </div>
 
@@ -217,44 +217,61 @@
 
     async function saveCategoryOrder() {
       if(!currentTab) return;
-
       const count = configLayout.columnCount || 3;
       const key = `${currentTab}_${count}`;
       if(!configLayout.colMap) configLayout.colMap = {};
-
       const cols = Array.from(document.querySelectorAll('.masonry-col')).map(col =>
         Array.from(col.querySelectorAll('.cat-card')).map(card => card.dataset.id)
       );
       configLayout.colMap[key] = serializeColAssignment(cols);
-
       try {
         setSync('load');
-        const cleanLayout = JSON.parse(JSON.stringify(configLayout));
-        await setDoc(doc(db, "config", "layout"), cleanLayout, { merge: true });
+        await setDoc(doc(db, "config", "layout"), { colMap: configLayout.colMap }, { merge: true });
         setSync('ok');
-      } catch (e) {
-        console.error('Erreur sauvegarde ordre catégories :', e);
-        setSync('err');
-      }
+      } catch (e) { setSync('err'); }
     }
 
     function initSortables() {
       document.querySelectorAll('.masonry-col').forEach(el => {
         sortableInstances.push(new Sortable(el, {
-          group: 'categories',
-          animation: 150,
-          handle: '.cat-header',
-          ghostClass: 'ghost',
-          forceFallback: true,
+          group: 'categories', animation: 150, handle: '.cat-header', ghostClass: 'ghost', forceFallback: true,
           onEnd: saveCategoryOrder
         }));
       });
+
       document.querySelectorAll('.items-container').forEach(el => {
-        sortableInstances.push(new Sortable(el, { group: 'bookmarks', animation: 150, ghostClass: 'ghost', onEnd: async (evt) => {
-            if (!isEditing && evt.from !== evt.to) {
-                await updateDoc(doc(db, "bookmarks", evt.item.dataset.id), { category: evt.to.dataset.cat.toUpperCase() });
+        sortableInstances.push(new Sortable(el, { 
+          group: 'bookmarks', animation: 150, ghostClass: 'ghost', 
+          onEnd: async (evt) => {
+            setSync('load');
+            try {
+                // 1. Si changement de catégorie, on met à jour le document Firestore du favori
+                if (evt.from !== evt.to) {
+                    await updateDoc(doc(db, "bookmarks", evt.item.dataset.id), { 
+                        category: evt.to.dataset.cat.toUpperCase() 
+                    });
+                }
+                
+                // 2. On met à jour l'ordre dans l'objet global configLayout
+                if(!configLayout.items) configLayout.items = {};
+                
+                const updateCatOrder = (container) => {
+                    const catName = container.dataset.cat;
+                    configLayout.items[catName] = Array.from(container.querySelectorAll('.bookmark-item')).map(i => i.dataset.id);
+                };
+
+                updateCatOrder(evt.from);
+                if (evt.from !== evt.to) updateCatOrder(evt.to);
+
+                // 3. On synchronise l'ordre complet avec Firestore
+                await setDoc(doc(db, "config", "layout"), { items: configLayout.items }, { merge: true });
+                setSync('ok');
+            } catch (e) {
+                console.error(e);
+                setSync('err');
             }
-        }}));
+          }
+        }));
       });
     }
 
@@ -262,32 +279,26 @@
       isEditing = document.getElementById('edit-toggle').checked;
       document.body.classList.toggle('edit-mode', isEditing);
       document.getElementById('save-config-btn').classList.toggle('hidden', !isEditing);
-      if (!isEditing) location.reload();
+      if (!isEditing) refreshUI();
     };
 
     window.manualSave = async () => {
       setSync('load');
       const btn = document.getElementById('save-config-btn');
       btn.disabled = true;
-
       const count = configLayout.columnCount || 3;
       const key = `${currentTab}_${count}`;
-      
       try {
         if(!configLayout.colMap) configLayout.colMap = {};
         const newCols = Array.from(document.querySelectorAll('.masonry-col')).map(col => 
             Array.from(col.querySelectorAll('.cat-card')).map(g => g.dataset.id)
         );
         configLayout.colMap[key] = serializeColAssignment(newCols);
-
         if(!configLayout.items) configLayout.items = {};
         document.querySelectorAll('.items-container').forEach(el => {
             configLayout.items[el.dataset.cat] = Array.from(el.querySelectorAll('.bookmark-item')).map(c => c.dataset.id);
         });
-
-        const cleanLayout = JSON.parse(JSON.stringify(configLayout));
-        await setDoc(doc(db, "config", "layout"), cleanLayout, { merge: true });
-        
+        await setDoc(doc(db, "config", "layout"), configLayout, { merge: true });
         btn.innerText = "✅ SAUVÉ";
         setTimeout(() => {
           document.getElementById('edit-toggle').checked = false;
@@ -296,12 +307,7 @@
           btn.innerText = "💾 SAVE CONFIG";
           setSync('ok');
         }, 800);
-      } catch (e) {
-        console.error("Firebase Error:", e);
-        setSync('err');
-        btn.innerText = "❌ ERREUR";
-        btn.disabled = false;
-      }
+      } catch (e) { setSync('err'); btn.disabled = false; }
     };
 
     window.toggleCollapse = async (cat) => {
@@ -309,7 +315,7 @@
         if(!configLayout.collapsed) configLayout.collapsed = {};
         configLayout.collapsed[k] = !configLayout.collapsed[k];
         renderContent();
-        await setDoc(doc(db, "config", "layout"), configLayout, { merge: true });
+        await setDoc(doc(db, "config", "layout"), { collapsed: configLayout.collapsed }, { merge: true });
     };
 
     window.globalCollapse = async (s) => {
@@ -317,15 +323,13 @@
         if(!configLayout.collapsed) configLayout.collapsed = {};
         cats.forEach(c => { configLayout.collapsed[(currentTab + '||' + c).toUpperCase()] = s; });
         renderContent();
-        await setDoc(doc(db, "config", "layout"), configLayout, { merge: true });
+        await setDoc(doc(db, "config", "layout"), { collapsed: configLayout.collapsed }, { merge: true });
     };
 
     window.showTabMenu = (e, t) => { e.preventDefault(); e.stopPropagation(); selTabName = t; const m = document.getElementById('ctx-menu'); m.innerHTML = `<div class="px-3 py-1 text-[10px] font-bold text-slate-400 border-b mb-1 uppercase">${t}</div><div onclick="deleteCurrentTab()" class="cm-item text-red-500"><span>✕</span> SUPPRIMER</div>`; m.style.display = 'block'; m.style.left = e.pageX + 'px'; m.style.top = e.pageY + 'px'; };
     
     window.showBookMenu = (e, id, t) => { 
-        e.preventDefault(); 
-        e.stopPropagation(); 
-        selId = id; 
+        e.preventDefault(); e.stopPropagation(); selId = id; 
         const m = document.getElementById('ctx-menu'); 
         let h = `<div class="px-3 py-1 text-[10px] font-bold text-slate-400 border-b mb-1 uppercase truncate">${t}</div>
                  <div onclick="cmAction('rename')" class="cm-item"><span>✎</span> RENOMMER</div>
@@ -338,9 +342,7 @@
             cats.forEach(c => h += `<div onclick="moveBookmarkTo('${tab}','${c}')" class="px-4 py-1.5 hover:bg-blue-50 text-[11px] font-bold text-slate-600 cursor-pointer border-b">↳ ${c}</div>`); 
         }); 
         m.innerHTML = h + `</div></div>`; 
-        m.style.display = 'block'; 
-        m.style.left = e.pageX + 'px'; 
-        m.style.top = e.pageY + 'px'; 
+        m.style.display = 'block'; m.style.left = e.pageX + 'px'; m.style.top = e.pageY + 'px'; 
     };
 
     window.showCatMenu = (e, c) => { e.preventDefault(); e.stopPropagation(); selCat = c; const m = document.getElementById('ctx-menu'); let h = `<div class="px-3 py-1 text-[10px] font-bold text-slate-400 border-b mb-1 uppercase">${c}</div><div onclick="openAllInCategory()" class="cm-item text-blue-600"><span>🌍</span> OUVRIR TOUT</div><div class="cm-item cm-has-sub"><span>➡</span> DÉPLACER VERS ONGLETS...<div class="cm-submenu">`; (configLayout.tabs || []).forEach(t => h += `<div onclick="moveCat('${t}')" class="px-4 py-1.5 hover:bg-blue-50 text-[11px] font-bold text-slate-600 cursor-pointer border-b">${t}</div>`); m.innerHTML = h + `</div></div>`; m.style.display = 'block'; m.style.left = e.pageX + 'px'; m.style.top = e.pageY + 'px'; };
@@ -360,27 +362,24 @@
             if(ref) {
                 setSync('load');
                 try {
-                    const newDocRef = doc(collection(db, "bookmarks"));
-                    await setDoc(newDocRef, {
-                        title: "---------------",
-                        url: "https://separator",
-                        tab: ref.tab.toUpperCase(),
-                        category: ref.category.toUpperCase()
+                    await setDoc(doc(collection(db, "bookmarks")), {
+                        title: "---------------", url: "https://separator",
+                        tab: ref.tab.toUpperCase(), category: ref.category.toUpperCase()
                     });
                     setSync('ok');
-                } catch(e) { console.error(e); setSync('err'); }
+                } catch(e) { setSync('err'); }
             }
         }
         hideMenus(); 
     };
 
-    window.addNewTab = async () => { const n = prompt("NOM :"); if(n) { if(!configLayout.tabs) configLayout.tabs = []; configLayout.tabs.push(n.toUpperCase()); await setDoc(doc(db, "config", "layout"), configLayout, { merge: true }); setTab(n.toUpperCase()); } };
-    window.deleteCurrentTab = async () => { if(confirm("Supprimer l'onglet ?")) { const batch = writeBatch(db); allBookmarks.filter(b => b.tab.toUpperCase() === selTabName.toUpperCase()).forEach(f => batch.delete(doc(db, "bookmarks", f.id))); configLayout.tabs = configLayout.tabs.filter(t => t !== selTabName); await setDoc(doc(db, "config", "layout"), configLayout); refreshUI(); hideMenus(); } };
+    window.addNewTab = async () => { const n = prompt("NOM :"); if(n) { if(!configLayout.tabs) configLayout.tabs = []; configLayout.tabs.push(n.toUpperCase()); await setDoc(doc(db, "config", "layout"), { tabs: configLayout.tabs }, { merge: true }); setTab(n.toUpperCase()); } };
+    window.deleteCurrentTab = async () => { if(confirm("Supprimer l'onglet ?")) { const batch = writeBatch(db); allBookmarks.filter(b => b.tab.toUpperCase() === selTabName.toUpperCase()).forEach(f => batch.delete(doc(db, "bookmarks", f.id))); configLayout.tabs = configLayout.tabs.filter(t => t !== selTabName); await setDoc(doc(db, "config", "layout"), { tabs: configLayout.tabs }); refreshUI(); hideMenus(); } };
     window.openAllInCategory = () => { allBookmarks.filter(b => b.tab.toUpperCase() === currentTab && b.category.toUpperCase() === selCat).forEach(f => window.open(f.url, '_blank')); hideMenus(); };
     
     function hideMenus() { document.getElementById('ctx-menu').style.display = 'none'; }
     document.addEventListener('click', hideMenus);
-    window.setColumns = async (c) => { configLayout.columnCount = c; renderContent(); await setDoc(doc(db, "config", "layout"), configLayout, { merge: true }); };
+    window.setColumns = async (c) => { configLayout.columnCount = c; renderContent(); await setDoc(doc(db, "config", "layout"), { columnCount: c }, { merge: true }); };
     window.openAddModal = () => window.open('add.html', 'Ajout', 'width=450,height=650');
 
     document.getElementById('search').addEventListener('keyup', (e) => {
