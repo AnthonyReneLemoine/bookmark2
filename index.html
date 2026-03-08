@@ -8,38 +8,86 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
   <style>
-    body { font-family: -apple-system, system-ui, sans-serif; background: #f8fafc; padding-bottom: 60px; user-select: none; }
+    body { font-family: -apple-system, system-ui, sans-serif; background: #f8fafc; padding-bottom: 80px; user-select: none; }
     #initial-loader { position: fixed; inset: 0; background: white; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; }
     .spinner { width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top-color: #3b82f6; border-radius: 50%; animation: spin 1s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
+    /* TABS */
     #tabs-bar button.tab-btn { text-transform: uppercase; letter-spacing: 0.5px; font-size: 11px; font-weight: 700; padding: 10px 18px; border-radius: 8px 8px 0 0; margin-right: 2px; transition: 0.2s; white-space: nowrap; color: #64748b; background: #f1f5f9; cursor: pointer; border-bottom: 3px solid transparent; }
     .tab-active { border-bottom: 3px solid #2563eb !important; color: #2563eb !important; background: white !important; }
-    
-    .masonry-col { display: flex; flex-direction: column; gap: 20px; min-height: 200px; padding-bottom: 100px; }
+
+    /* MASONRY */
+    .masonry-col { display: flex; flex-direction: column; gap: 16px; min-height: 200px; padding-bottom: 100px; }
     .cat-card { background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; height: fit-content; overflow: hidden; }
-    .cat-header { padding: 10px 14px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-weight: 600; color: #475569; display: flex; justify-content: space-between; align-items: center; cursor: grab; }
+    .cat-header { padding: 10px 14px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-weight: 600; color: #475569; display: flex; justify-content: space-between; align-items: center; cursor: grab; min-height: 44px; }
     .cat-header span { text-transform: uppercase; letter-spacing: 0.5px; font-size: 11px; }
 
-    .bookmark-item { padding: 8px 12px; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; cursor: pointer; background: white; }
+    .bookmark-item { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; cursor: pointer; background: white; min-height: 44px; }
     .bookmark-item:hover { background: #f8fafc; }
-    .favicon { width: 14px; height: 14px; margin-right: 10px; border-radius: 2px; }
-    .bm-link { flex: 1; font-size: 12px; color: #334155; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .favicon { width: 16px; height: 16px; margin-right: 10px; border-radius: 2px; flex-shrink: 0; }
+    .bm-link { flex: 1; font-size: 13px; color: #334155; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
     #sync-badge { font-size: 9px; font-weight: 800; padding: 2px 8px; border-radius: 9999px; text-transform: uppercase; }
     .sync-ok { background: #064e3b; color: #6ee7b7; border: 1px solid #065f46; }
     .sync-err { background: #7f1d1d; color: #fecaca; border: 1px solid #991b1b; }
     .sync-load { background: #78350f; color: #fde68a; border: 1px solid #92400e; }
 
-    .ctx-menu { position: fixed; z-index: 1000; width: 220px; background: white; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1); padding: 5px; display: none; }
-    .cm-item { padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; color: #334155; display: flex; align-items: center; gap: 8px; }
-    .cm-item:hover { background: #f1f5f9; color: #2563eb; }
-    .cm-submenu { position: absolute; left: 100%; top: -5px; width: 180px; background: white; border: 1px solid #e2e8f0; border-radius: 8px; display: none; padding: 4px; box-shadow: 0 10px 15px rgba(0,0,0,0.1); }
+    /* CONTEXT MENU */
+    .ctx-menu { position: fixed; z-index: 1000; width: 240px; background: white; border: 1px solid #e2e8f0; border-radius: 10px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.15); padding: 5px; display: none; }
+    .cm-item { padding: 11px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; color: #334155; display: flex; align-items: center; gap: 8px; }
+    .cm-item:hover, .cm-item:active { background: #f1f5f9; color: #2563eb; }
+    .cm-submenu { position: absolute; left: 100%; top: -5px; width: 200px; background: white; border: 1px solid #e2e8f0; border-radius: 8px; display: none; padding: 4px; box-shadow: 0 10px 15px rgba(0,0,0,0.1); max-height: 60vh; overflow-y: auto; }
     .cm-has-sub:hover > .cm-submenu { display: block; }
+
+    /* On mobile, submenus appear below instead of to the right */
+    @media (max-width: 640px) {
+      .cm-submenu { left: 0; top: 100%; width: 100%; }
+    }
 
     .edit-mode .masonry-col { border: 2px dashed #3b82f6; background: rgba(59, 130, 246, 0.02); }
     .ghost { opacity: 0.1; background: #3b82f6 !important; border: 1px dashed #3b82f6 !important; }
     .no-scrollbar::-webkit-scrollbar { display: none; }
+
+    /* ─── HEADER RESPONSIVE ─── */
+    /* Mobile: stack controls */
+    @media (max-width: 640px) {
+      #header-controls { flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+      #header-right { flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+      #search { width: 120px !important; }
+      #search:focus { width: 160px !important; }
+      #btn-add { padding: 6px 14px !important; }
+      #save-config-btn { padding: 6px 12px !important; font-size: 9px !important; }
+      .col-btns { display: none; } /* Hidden on mobile, auto-1col */
+    }
+
+    /* ─── MAIN CONTENT RESPONSIVE ─── */
+    #main-content {
+      display: flex;
+      gap: 16px;
+    }
+
+    /* Mobile: 1 colonne */
+    @media (max-width: 640px) {
+      #main-content { flex-direction: column; gap: 12px; }
+      .masonry-col { padding-bottom: 20px; }
+      main { padding: 10px !important; }
+    }
+
+    /* Tablette: max 2 colonnes */
+    @media (min-width: 641px) and (max-width: 1024px) {
+      #main-content { flex-wrap: wrap; }
+      .masonry-col { min-width: calc(50% - 8px); flex: 1 1 calc(50% - 8px); }
+      main { padding: 16px !important; }
+    }
+
+    /* Desktop Full HD: colonnes normales */
+    @media (min-width: 1025px) {
+      .masonry-col { flex: 1; }
+    }
+
+    /* Touch: long-press instead of right-click */
+    .bookmark-item, .cat-header { -webkit-touch-callout: none; }
   </style>
 </head>
 <body>
@@ -47,33 +95,41 @@
   <div id="initial-loader"><div class="spinner"></div></div>
 
   <header class="bg-slate-900 text-white sticky top-0 z-50">
-    <div class="max-w-[1600px] mx-auto px-4 py-3 flex justify-between items-center">
-      <div class="flex items-center gap-4">
-          <h1 class="text-lg font-black tracking-tighter italic text-blue-400">MANAGER V46</h1>
-          <div id="sync-badge" class="sync-ok">SYNC: OK</div>
+    <div class="max-w-[1600px] mx-auto px-3 py-2 flex flex-wrap justify-between items-center gap-2">
+
+      <!-- LEFT: title + sync -->
+      <div class="flex items-center gap-3 shrink-0">
+        <h1 class="text-base font-black tracking-tighter italic text-blue-400">MANAGER V46</h1>
+        <div id="sync-badge" class="sync-ok">SYNC: OK</div>
       </div>
 
-      <div class="flex items-center gap-3 bg-slate-800 p-1 rounded-full px-4 border border-slate-700">
-          <div class="flex items-center gap-2 pr-4 border-r border-slate-700">
-            <span class="text-[9px] font-black text-slate-500 uppercase">ÉDITION</span>
-            <input type="checkbox" id="edit-toggle" class="sr-only peer" onchange="toggleEditMode()">
-            <div onclick="document.getElementById('edit-toggle').click()" class="w-8 h-4 bg-slate-600 rounded-full relative cursor-pointer peer-checked:bg-blue-500 transition-all after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:after:translate-x-4"></div>
-          </div>
-          <div class="flex gap-4">
-            <button onclick="globalCollapse(true)" class="text-[9px] font-bold text-slate-400 hover:text-white">COLLAPSE</button>
-            <button onclick="globalCollapse(false)" class="text-[9px] font-bold text-slate-400 hover:text-white">EXPAND</button>
-          </div>
-          <div class="flex items-center gap-1 ml-2">
-            <button onclick="setColumns(2)" id="btn-col-2" class="w-6 h-6 rounded text-[10px] font-bold hover:bg-slate-700">2</button>
-            <button onclick="setColumns(3)" id="btn-col-3" class="w-6 h-6 rounded text-[10px] font-bold hover:bg-slate-700">3</button>
-          </div>
+      <!-- CENTER: controls (hidden on mobile except edit toggle) -->
+      <div id="header-controls" class="flex items-center gap-2 bg-slate-800 p-1 rounded-full px-3 border border-slate-700 flex-wrap">
+        <!-- Edit toggle -->
+        <div class="flex items-center gap-2 pr-3 border-r border-slate-700">
+          <span class="text-[9px] font-black text-slate-500 uppercase hidden sm:inline">ÉDITION</span>
+          <input type="checkbox" id="edit-toggle" class="sr-only peer" onchange="toggleEditMode()">
+          <div onclick="document.getElementById('edit-toggle').click()" class="w-8 h-4 bg-slate-600 rounded-full relative cursor-pointer peer-checked:bg-blue-500 transition-all after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:after:translate-x-4"></div>
+        </div>
+        <!-- Collapse/Expand -->
+        <div class="flex gap-3">
+          <button onclick="globalCollapse(true)" class="text-[9px] font-bold text-slate-400 hover:text-white active:text-white py-1 px-1">▲</button>
+          <button onclick="globalCollapse(false)" class="text-[9px] font-bold text-slate-400 hover:text-white active:text-white py-1 px-1">▼</button>
+        </div>
+        <!-- Column selector - hidden on mobile -->
+        <div class="col-btns flex items-center gap-1 ml-1">
+          <button onclick="setColumns(2)" id="btn-col-2" class="w-7 h-7 rounded text-[10px] font-bold hover:bg-slate-700 active:bg-slate-600">2</button>
+          <button onclick="setColumns(3)" id="btn-col-3" class="w-7 h-7 rounded text-[10px] font-bold hover:bg-slate-700 active:bg-slate-600">3</button>
+        </div>
       </div>
 
-      <div class="flex gap-3 items-center">
-        <button id="save-config-btn" onclick="manualSave()" class="hidden bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg transition-all">💾 SAVE CONFIG</button>
-        <input type="text" id="search" placeholder="RECHERCHE..." class="bg-slate-800 px-4 py-1.5 rounded-full text-xs w-32 focus:w-48 outline-none border border-transparent focus:border-blue-500 transition-all">
-        <button onclick="openAddModal()" class="bg-blue-600 hover:bg-blue-700 px-5 py-1.5 rounded-full text-xs font-bold shadow-md">+ ADD</button>
+      <!-- RIGHT: save, search, add -->
+      <div id="header-right" class="flex gap-2 items-center">
+        <button id="save-config-btn" onclick="manualSave()" class="hidden bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg transition-all">💾 SAVE</button>
+        <input type="text" id="search" placeholder="🔍 Recherche..." class="bg-slate-800 px-3 py-1.5 rounded-full text-xs w-28 sm:w-36 focus:w-44 sm:focus:w-52 outline-none border border-transparent focus:border-blue-500 transition-all text-white placeholder-slate-500">
+        <button id="btn-add" onclick="openAddModal()" class="bg-blue-600 hover:bg-blue-700 active:bg-blue-800 px-4 py-1.5 rounded-full text-xs font-bold shadow-md whitespace-nowrap">+ ADD</button>
       </div>
+
     </div>
   </header>
 
@@ -404,6 +460,63 @@
         const v = e.target.value.toLowerCase();
         document.querySelectorAll('.bookmark-item').forEach(el => el.style.display = el.innerText.toLowerCase().includes(v) ? 'flex' : 'none');
     });
+
+    // ── LONG PRESS (mobile context menu) ──────────────────────────────
+    let longPressTimer = null;
+    const LONG_PRESS_MS = 500;
+
+    function attachLongPress(el, handler) {
+        el.addEventListener('touchstart', (e) => {
+            longPressTimer = setTimeout(() => {
+                handler(e.touches[0]);
+            }, LONG_PRESS_MS);
+        }, { passive: true });
+        el.addEventListener('touchend', () => clearTimeout(longPressTimer));
+        el.addEventListener('touchmove', () => clearTimeout(longPressTimer));
+    }
+
+    // Patch renderContent to also bind long press after render
+    const _origRenderContent = renderContent;
+    function patchLongPress() {
+        document.querySelectorAll('.bookmark-item[data-id]').forEach(el => {
+            if (el.dataset.longpress) return;
+            el.dataset.longpress = '1';
+            const id = el.dataset.id;
+            const title = el.querySelector('.bm-link')?.textContent || 'SÉPARATEUR';
+            attachLongPress(el, (touch) => {
+                const fakeEvt = { clientX: touch.clientX, clientY: touch.clientY, preventDefault: ()=>{}, stopPropagation: ()=>{} };
+                showBookMenu(fakeEvt, id, title);
+            });
+        });
+        document.querySelectorAll('.cat-header[oncontextmenu]').forEach(el => {
+            if (el.dataset.longpress) return;
+            el.dataset.longpress = '1';
+            const m = el.getAttribute('oncontextmenu');
+            const catMatch = m?.match(/showCatMenu\(event,\s*'(.+?)'\)/);
+            if (catMatch) attachLongPress(el, (touch) => {
+                const fakeEvt = { clientX: touch.clientX, clientY: touch.clientY, preventDefault: ()=>{}, stopPropagation: ()=>{} };
+                showCatMenu(fakeEvt, catMatch[1]);
+            });
+        });
+    }
+
+    // Auto 1-col on mobile
+    function applyMobileColumnOverride() {
+        if (window.innerWidth <= 640) {
+            const cols = document.querySelectorAll('.masonry-col');
+            cols.forEach(c => { c.style.flex = '1 1 100%'; c.style.minWidth = '100%'; });
+        }
+    }
+
+    const origRefreshUI = refreshUI;
+    // Patch post-render
+    const _obs = new MutationObserver(() => {
+        patchLongPress();
+        applyMobileColumnOverride();
+    });
+    _obs.observe(document.getElementById('main-content'), { childList: true, subtree: true });
+
+    window.addEventListener('resize', applyMobileColumnOverride);
   </script>
 </body>
 </html>
