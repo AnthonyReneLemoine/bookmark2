@@ -308,6 +308,17 @@
       return Object.fromEntries(cols.map((cats, i) => [`c${i}`, cats.filter(Boolean)]));
     }
 
+    function sanitizeColAssignment(cols, groupsMap) {
+      const seen = new Set();
+      const normalized = cols.map(cats =>
+        cats.filter(cat => groupsMap[cat] && !seen.has(cat) && (seen.add(cat), true))
+      );
+      Object.keys(groupsMap).forEach(cat => {
+        if (!seen.has(cat)) normalized[0].push(cat);
+      });
+      return normalized;
+    }
+
     function renderContent() {
       sortableInstances.forEach(i => i.destroy());
       sortableInstances = [];
@@ -326,10 +337,11 @@
       if (!colAssignment) {
           colAssignment = Array.from({length: count}, () => []);
           Object.keys(groupsMap).forEach((cat, i) => colAssignment[i % count].push(cat));
-      } else {
-          const assigned = colAssignment.flat();
-          Object.keys(groupsMap).forEach(cat => { if(!assigned.includes(cat)) colAssignment[0].push(cat); });
       }
+
+      colAssignment = sanitizeColAssignment(colAssignment, groupsMap);
+      configLayout.colMap = configLayout.colMap || {};
+      configLayout.colMap[key] = serializeColAssignment(colAssignment);
 
       colAssignment.forEach((cats, i) => {
           const colDiv = document.createElement('div');
@@ -530,15 +542,18 @@
                 Object.values(configLayout.colMap).forEach(colEntry => {
                     if (typeof colEntry === 'object') {
                         Object.keys(colEntry).forEach(k => {
-                            if (Array.isArray(colEntry[k]))
-                                colEntry[k] = colEntry[k].map(c => c === selCat ? newCat : c);
+                            if (Array.isArray(colEntry[k])) {
+                                const renamed = colEntry[k].map(c => c === selCat ? newCat : c);
+                                colEntry[k] = [...new Set(renamed)];
+                            }
                         });
                     }
                 });
             }
 
             if (configLayout.items?.[selCat] !== undefined) {
-                configLayout.items[newCat] = configLayout.items[selCat];
+                const existingOrder = configLayout.items[newCat] || [];
+                configLayout.items[newCat] = [...new Set([...existingOrder, ...configLayout.items[selCat]])];
                 delete configLayout.items[selCat];
             }
 
